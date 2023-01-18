@@ -1,0 +1,138 @@
+// General Elastic sphere
+
+//for general elastic (non-isotropic)
+method_instance genlastic method general_linear_elastic
+quantity lasticE energy function genlastic.value
+define facet attribute elastic_basis real[2][2]
+define facet attribute elastic_coeff real[6]
+
+// make a cube
+
+vertices
+1  -1.0 -1.0 -1.0
+2  1.0 -1.0 -1.0
+3  1.0 1.0 -1.0
+4  -1.0 1.0 -1.0
+5  -1.0 -1.0 1.0
+6  1.0 -1.0 1.0
+7  1.0 1.0 1.0
+8  -1.0 1.0 1.0
+
+edges  /* given by endpoints and attribute */
+1   1 2
+2   2 3
+3   3 4
+4   4 1
+5   5 6
+6   6 7
+7   7 8
+8   8 5
+9   1 5
+10  2 6
+11  3 7
+12  4 8
+
+faces  /* given by oriented edge loop */
+1   1 10 -5  -9
+2   2 11 -6 -10
+3   3 12 -7 -11
+4   4  9 -8 -12
+5   5  6  7   8
+6  -4 -3 -2  -1
+
+bodies  /* one body, defined by its oriented faces */
+1   1 2 3 4 5 6  volume 1
+
+read
+
+showq;
+
+//turn it into a sphere
+g5;
+//u;
+r;
+g5;
+hessian;
+r;
+g5;
+hessian;
+//r;
+//g5;
+//r;
+//g5;
+
+// make it elastic
+
+bodies[1].target := 1;
+g1000;
+set facet tension 0;
+g100;
+
+set facet method_instance genlastic
+
+foreach facet ff do {
+
+  foreach ff.edge ee do{
+      if ff.vertex[1].id == ee.vertex[1].id then {
+        v1l:=ee.length;
+      }
+      else if ff.vertex[1].id == ee.vertex[2].id then {
+        v2l:=ee.length;
+      }
+    };
+
+
+  //v1l:=ff.vertex[1].edge[1].length;
+  v1dv2:=
+  (ff.vertex[2].x-ff.vertex[1].x)*(ff.vertex[3].x-ff.vertex[1].x)+
+  (ff.vertex[2].y-ff.vertex[1].y)*(ff.vertex[3].y-ff.vertex[1].y)+
+  (ff.vertex[2].z-ff.vertex[1].z)*(ff.vertex[3].z-ff.vertex[1].z);
+  //v2l:=ff.vertex[1].edge[2].length;
+
+  set ff.elastic_basis[1][1] v1l;
+  set ff.elastic_basis[1][2] 0;
+  set ff.elastic_basis[2][1] v1dv2/v1l;
+  set ff.elastic_basis[2][2] sqrt(-(v1dv2^2-v1l^2*v2l^2)/v1l^2);
+  //{1.33333, 1.33333, 0.666667, 0, 0, 1.33333}
+  set ff.elastic_coeff[1] 1.33333;
+  set ff.elastic_coeff[2] 1.33333;
+  set ff.elastic_coeff[3] 0.666667;
+  set ff.elastic_coeff[4] 0;
+  set ff.elastic_coeff[5] 0;
+  set ff.elastic_coeff[6] 1.33333;
+}
+
+pp := {
+ii:=1;
+while ii<5 do {
+/*
+printf "%d,%f,%f,%f\n",1,facet[ii].vertex[1].x,facet[ii].vertex[1].y,facet[ii].vertex[1].z;
+printf "%d,%f,%f,%f\n",2,facet[ii].vertex[2].x,facet[ii].vertex[2].y,facet[ii].vertex[2].z;
+printf "%d,%f,%f,%f\n",3,facet[ii].vertex[3].x,facet[ii].vertex[3].y,facet[ii].vertex[3].z;
+*/
+printf "%f,%f,%f\n",facet[ii].edge[1].length,facet[ii].edge[2].length,facet[ii].edge[3].length;
+printf "%d,{{%f,%f},{%f,%f}}\n\n",facet[ii].id,facet[ii].elastic_basis[1][1],facet[ii].elastic_basis[1][2],facet[ii].elastic_basis[2][1],facet[ii].elastic_basis[2][2];
+ii:=ii+1;
+};
+}
+
+print_volume_to_file :=
+{
+ printf "%g, %g\n",bodies[1].pressure,bodies[1].volume >> "sphere_pV.txt"
+}
+
+printf "p,v\n" >>> "sphere_pV.txt";
+
+print_volume_to_file
+
+// expand and measure pressure-volume relationship
+
+ii:=1;
+unset bodies target;
+
+while ii<11 do {
+ bodies[1].pressure := bodies[1].pressure+.1;
+ g300;
+ print_volume_to_file;
+ ii:=ii+1;
+}

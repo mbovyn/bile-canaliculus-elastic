@@ -1,0 +1,120 @@
+// Elastic sphere
+
+//method_instance surface_spring method linear_elastic
+//quantity spring_energy energy function surface_spring.value
+//quantity stretch energy method linear_elastic global
+//quantity elastic energy method linear_elastic global
+
+define facet attribute poisson_ratio real
+define facet attribute form_factors real[3]
+
+// make a cube
+
+vertices
+1  -1.0 -1.0 -1.0
+2  1.0 -1.0 -1.0
+3  1.0 1.0 -1.0
+4  -1.0 1.0 -1.0
+5  -1.0 -1.0 1.0
+6  1.0 -1.0 1.0
+7  1.0 1.0 1.0
+8  -1.0 1.0 1.0
+
+edges  /* given by endpoints and attribute */
+1   1 2
+2   2 3
+3   3 4
+4   4 1
+5   5 6
+6   6 7
+7   7 8
+8   8 5
+9   1 5
+10  2 6
+11  3 7
+12  4 8
+
+faces  /* given by oriented edge loop */
+1   1 10 -5  -9
+2   2 11 -6 -10
+3   3 12 -7 -11
+4   4  9 -8 -12
+5   5  6  7   8
+6  -4 -3 -2  -1
+
+bodies  /* one body, defined by its oriented faces */
+1   1 2 3 4 5 6  volume 1
+
+read
+
+showq;
+
+//turn it into a sphere
+g5;
+u;
+r;
+g5;
+r;
+g5;
+//r;
+//g5;
+//r;
+//g5;
+
+// make it elastic
+
+bodies[1].target := 1;
+g1000;
+set facet tension 0;
+g100;
+
+quantity elastic energy method linear_elastic global
+
+set facet poisson_ratio .5
+
+/*
+// Set edge rest lengths
+//set facet method_instance surface_spring;
+
+// Set poisson ratio and initial form_factor ie unstrained quantities
+// See here for more mystery details: http://facstaff.susqu.edu/brakke/evolver/html/quants.htm#linear_elastic
+foreach facet ff do
+{ set ff.form_factors[1]
+        (ff.vertex[2].x - ff.vertex[1].x)^2
+      + (ff.vertex[2].y - ff.vertex[1].y)^2
+      + (ff.vertex[2].z - ff.vertex[1].z)^2;
+  set ff.form_factors[2]
+        (ff.vertex[2].x - ff.vertex[1].x)
+       *(ff.vertex[3].x - ff.vertex[1].x)
+      + (ff.vertex[2].y - ff.vertex[1].y)
+       *(ff.vertex[3].y - ff.vertex[1].y)
+      + (ff.vertex[2].z - ff.vertex[1].z)
+       *(ff.vertex[3].z - ff.vertex[1].z);
+  set ff.form_factors[3]
+        (ff.vertex[3].x - ff.vertex[1].x)^2
+      + (ff.vertex[3].y - ff.vertex[1].y)^2
+      + (ff.vertex[3].z - ff.vertex[1].z)^2;
+
+  set ff poisson_ratio 0.5;
+}
+*/
+
+print_volume_to_file :=
+{
+ printf "%g, %g\n",bodies[1].pressure,bodies[1].volume >> "sphere_pV.txt"
+}
+
+printf "p,v\n" >>> "sphere_pV.txt";
+
+print_volume_to_file
+
+// expand and measure pressure-volume relationship
+
+ii:=1;
+unset bodies target;
+while ii<11 do {
+ bodies[1].pressure := bodies[1].pressure+.1;
+ g300;
+ print_volume_to_file;
+ ii:=ii+1;
+}

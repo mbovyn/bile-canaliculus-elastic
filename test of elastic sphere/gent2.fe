@@ -1,0 +1,73 @@
+// triangle1.fe
+
+//for general elastic (non-isotropic)
+method_instance genlastic method general_linear_elastic
+quantity lasticE energy function genlastic.value
+define facet attribute elastic_basis real[2][2]
+define facet attribute elastic_coeff real[6]
+
+vertices
+1	0 0 0
+2	0 1 0
+3	0 0 1
+
+edges
+1	1 2
+2	2 3
+3	3 1
+
+faces
+1	1 2 3
+
+read
+
+showq
+
+r
+
+set facet tension 0
+
+set facet method_instance genlastic
+
+foreach facet ff do {
+
+  foreach ff.edge ee do{
+      if ff.vertex[1].id == ee.vertex[1].id then {
+        v1l:=ee.length;
+      }
+      else if ff.vertex[1].id == ee.vertex[2].id then {
+        v2l:=ee.length;
+      }
+    };
+
+
+  //v1l:=ff.vertex[1].edge[1].length;
+  v1dv2:=
+  (ff.vertex[2].x-ff.vertex[1].x)*(ff.vertex[3].x-ff.vertex[1].x)+
+  (ff.vertex[2].y-ff.vertex[1].y)*(ff.vertex[3].y-ff.vertex[1].y)+
+  (ff.vertex[2].z-ff.vertex[1].z)*(ff.vertex[3].z-ff.vertex[1].z);
+  //v2l:=ff.vertex[1].edge[2].length;
+
+  set ff.elastic_basis[1][1] v1l;
+  set ff.elastic_basis[1][2] 0;
+  set ff.elastic_basis[2][1] v1dv2/v1l;
+  set ff.elastic_basis[2][2] sqrt(-(v1dv2^2-v1l^2*v2l^2)/v1l^2);
+  //{1.33333, 1.33333, 0.666667, 0, 0, 1.33333}
+  set ff.elastic_coeff[1] 1.33333;
+  set ff.elastic_coeff[2] 1.33333;
+  set ff.elastic_coeff[3] 0.666667;
+  set ff.elastic_coeff[4] 0;
+  set ff.elastic_coeff[5] 0;
+  set ff.elastic_coeff[6] 1.33333;
+}
+
+pp := {
+foreach vertex vv do {
+printf "%f,%f,%f\n",vv.x,vv.y,vv.z;
+};
+printf "\n";
+foreach facet ff do {
+  printf "edges %f,%f,%f\n",ff.edge[1].length,ff.edge[1].length,ff.edge[1].length;
+  print ff.elastic_basis;
+};
+}

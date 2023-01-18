@@ -1,0 +1,583 @@
+
+
+
+
+//measured values
+
+v_add:=1.77; //correct for measured rest width (sets rest volume)
+
+bulkheadyoungs_meas:=1.2; //Corresponds to measured value
+junctionyoungs_meas:=2.5; //Corresponds to measured value
+
+v_deformed:=4.85096; //Corresponds to inferred value
+p_deformed:=1.04996; //Corresponds to inferred value
+
+//set these initially, can be changed later
+bulkheadyoungs:=bulkheadyoungs_meas;
+junctionyoungs:=junctionyoungs_meas;
+cortexyoungs:=1;
+
+
+nickdepth:=.8
+nickw:=1/3.6
+nick_ablate:=0
+nickc:=.1255
+bbmin:=999
+bbmax:=-999
+
+ablation_oid:=68
+
+
+//initial setup --------------------------------------------------------------
+
+
+//refine initial rectangular prism
+ref_init:={
+  bodies[1].target:=bodies[1].volume;
+  r;
+  r;
+  u;
+}
+
+//round ends
+round:=
+{
+  foreach vertex vv do
+  {
+    if vv.y > er-brad then
+    {
+      yn:=((vv.z-.5)**2/((vv.y-(er-brad))**2 * arad**2) + 1/brad**2)**-.5;
+      zn:=(vv.z-.5)*yn/(vv.y-(er-brad));
+      vv.y:=yn+(er-brad);
+      vv.z:=zn+.5;
+    }
+    else if vv.y < brad then
+    {
+      yn:=((vv.z-.5)**2/((vv.y-(brad))**2 * arad**2) + 1/brad**2)**-.5;
+      zn:=(vv.z-.5)*yn/(vv.y-brad);
+      vv.y:=-yn+brad;
+      vv.z:=-zn+.5;
+    }
+  };
+}
+
+//even out altered facets
+ii:=0;
+massage:={
+  ii:=0;
+  while ii<30 do {
+    foreach vertex vv do {
+      bv:=1;
+      foreach vv.facet ff do if ff.color==green then bv:=0;
+      if bv==1 then {
+          vertex_average vv;
+        };
+      };
+    ii+=1;
+  };
+  //V 30;
+  //u 2;
+  refine facets where color==green;
+  u;
+}
+
+//do initial setup
+setup:={
+  ref_init;
+  round;
+  massage;
+}
+
+
+
+
+//evolve to rest shape
+
+fff:=1
+bff:=1
+set_ff:=
+{
+  foreach facet ff do
+    { if ff.color==green then fff:=bff;
+      set ff.form_factors[1]
+          (
+            fff*(ff.vertex[2].x - ff.vertex[1].x)^2
+          + (ff.vertex[2].y - ff.vertex[1].y)^2
+          + (ff.vertex[2].z - ff.vertex[1].z)^2);
+      set ff.form_factors[2]
+          (
+            fff*(ff.vertex[2].x - ff.vertex[1].x)
+           *(ff.vertex[3].x - ff.vertex[1].x)
+          + (ff.vertex[2].y - ff.vertex[1].y)
+           *(ff.vertex[3].y - ff.vertex[1].y)
+          + (ff.vertex[2].z - ff.vertex[1].z)
+           *(ff.vertex[3].z - ff.vertex[1].z));
+      set ff.form_factors[3]
+          (
+            fff*(ff.vertex[3].x - ff.vertex[1].x)^2
+          + (ff.vertex[3].y - ff.vertex[1].y)^2
+          + (ff.vertex[3].z - ff.vertex[1].z)^2);
+
+      set ff poisson_ratio 0.5;
+      set ff rest_area ff.area;
+      fff:=1;
+    };
+}
+
+set_bulkhead := {
+  foreach facet ff do
+  {
+    if ff.color == green then {
+      ff.youngs:=bulkheadyoungs;
+    };
+  };
+}
+
+set_junction:={
+  foreach facet ff do
+  {
+    ii:=1;
+    while ii<4 do {
+      if ff.vertex[ii].x>.10 && ff.vertex[ii].x<.15 && ff.color!=green then {
+        ff.color:=red;
+        ff.youngs:=junctionyoungs;
+        //fix ff.vertex[ii];
+      };
+      ii:=ii+1;
+    };
+  };
+}
+
+bulkheadyoungs_set:=1
+gotorest:={
+  //set elastic
+  set facet tension 0;
+  g10;
+  set facet method_instance linlastic;
+  set_ff;
+  //make bulkheads very weak
+  bulkheadyoungs_set:=bulkheadyoungs;
+  bulkheadyoungs:=.0001;
+  cortexyoungs:=1;
+  set_bulkhead;
+  //evolve to increased volume
+  //more volume added -> more round (x-z slice)
+  bodies[1].target:=bodies[1].volume+v_add;
+  //conj_grad;
+  g150;
+  rest_vol:=bodies[1].volume;
+  bulkheadyoungs:=bulkheadyoungs_set;
+}
+
+refine_bulkheads:={
+  l .2;
+  ii:=1;
+  while ii<20 do {
+    foreach vertex vv do {
+      bv:=0;
+      foreach vv.facet ff do if ff.color==green then bv:=1;
+      foreach vv.edge ee do if ee.valence==1 then bv:=0;
+      if bv==1 then {
+          vertex_average vv;
+        };
+      };
+    ii+=1;
+  };
+  refine facet where color==green;
+
+  //refine facets where original==ablation_oid;
+  // while ii<20 do {
+  //   foreach vertex vv do {
+  //     bv:=0;
+  //     foreach vv.facet ff do if ff.original==ablation_oid then bv:=1;
+  //     foreach vv.edge ee do if ee.valence==1 then bv:=0;
+  //     if bv==1 then {
+  //         vertex_average vv;
+  //       };
+  //     };
+  //   ii+=1;
+  // };
+  u;
+  if nick_ablate then {
+    refine facets where original==ablation_oid;
+    u;
+  };
+  //refine facets where original==ablation_oid;
+  //u;
+}
+
+
+// record size
+
+
+getmax:=
+{
+  maxb:=-999;
+  minb:=999;
+  maxx:=-999;
+  minx:=999;
+  maxy:=-999;
+  miny:=999;
+  maxz:=-999;
+  minz:=999;
+  foreach vertex vv do
+  {
+    if vv.x>maxx then maxx:=vv.x;
+    if vv.x<minx then minx:=vv.x;
+    if vv.y>maxy then maxy:=vv.y;
+    if vv.y<miny then miny:=vv.y;
+    if vv.z>maxz then maxz:=vv.z;
+    if vv.z<minz then minz:=vv.z;
+    foreach vv.facets ff do {
+      if (ff.color == green) then {
+        if vv.x>maxb then maxb:=vv.x;
+        if vv.x<minb then minb:=vv.x;
+      };
+    };
+  };
+  //print minx;
+  //print maxx;
+  //print maxb;
+}
+
+get_sums:={
+  ftot:=0;
+  ratot:=0;
+  datot:=0;
+  actot:=0;
+  foreach facet ff do { if ff.color!=red then {
+    ftot+=ff.youngs*(ff.area-ff.rest_area);
+    ratot+=ff.rest_area;
+    datot+=ff.area;
+    actot+=ff.rest_area*ff.youngs;
+  };};
+  tavg:=ftot/datot;
+}
+
+fname:="Error!.txt"
+headerprinted:=0
+print_to_file :=
+{
+  if !headerprinted then {
+    printf "p,v,maxx,maxy,maxz,maxb,v_add,bulkheadyoungs,cortexyoungs,junctionyoungs,ftot,ratot,datot,actot,tavg\n" >>> fname;
+    headerprinted:=1;
+  };
+  printf "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",bodies[1].pressure,bodies[1].volume,
+    maxx-minx,
+    maxy-miny,
+    maxz-minz,
+    maxb-minb,
+    v_add,
+    bulkheadyoungs,
+    cortexyoungs,
+    junctionyoungs,
+    ftot,
+    ratot,
+    datot,
+    actot,
+    tavg
+     >> fname;
+}
+
+
+
+
+// Inflate to deformed shape
+
+
+
+
+vt:=1
+gotov:={
+  unset bodies[1].pressure;
+  bodies[1].target:=vt;
+  conj_grad;
+  g750;
+}
+
+
+set_rest:={
+  refine_bulkheads;
+  //set the current shape as the rest shape
+  set_ff;
+  g10;
+  //set the moduli
+  set_bulkhead;
+  set_junction;
+}
+
+
+gotodeformed:={
+  set_rest;
+  vt:=v_deformed;
+  gotov;
+}
+
+
+
+
+//Expand to measure p-V curve
+
+
+set_cortex:={
+  foreach facet ff do
+  {
+    if ff.color == white then ff.youngs:=cortexyoungs;
+  }
+}
+
+pt:=1
+gotop:={
+  unset bodies[1].target;
+  bodies[1].pressure:=pt;
+  conj_grad;
+  g1000;
+}
+
+c_add:=1
+cxpand:={
+  conj_grad;
+  ii:=1;
+  print_to_file;
+  while ii<6 do {
+    cortexyoungs+=c_add;
+    set_cortex;
+    g500;
+    print_to_file;
+    ii:=ii+1;
+  };
+}
+
+
+
+
+// Estimates for area, force
+
+
+p_add:=.1
+pxpand:={
+  conj_grad;
+  ii:=1;
+  while ii<10 do {
+    bodies[1].pressure+=p_add;
+    g1000;
+    getmax;
+    get_sums;
+    print_to_file;
+    ii:=ii+1;
+  };
+}
+
+facetfname:="facets.txt"
+vertexfname:="vertices.txt"
+dump_info:={
+  printf "id,area,youngs,cenx,ceny,cenz,v1x,v1y,v1z,v2x,v2y,v2z\n" >>> facetfname;
+  foreach facet ff do {
+    ii:=0;
+    foreach ff.vertex vv do {
+      jj:=1;
+      while jj<4 do {
+        center[jj]+=vv.x[jj];
+        jj+=1;
+      };
+      ii+=1;
+    };
+    jj:=1;
+    while jj<4 do {
+      center[jj]:=center[jj]/ii;
+      jj+=1;
+    };
+    printf "%d,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+      ff.id,
+      ff.area,
+      ff.youngs,
+      center[1],
+      center[2],
+      center[3],
+      ff.vertex[2].x-ff.vertex[1].x,
+      ff.vertex[2].y-ff.vertex[1].y,
+      ff.vertex[2].z-ff.vertex[1].z,
+      ff.vertex[3].x-ff.vertex[1].x,
+      ff.vertex[3].y-ff.vertex[1].y,
+      ff.vertex[3].z-ff.vertex[1].z
+       >> facetfname;
+  };
+}
+
+
+ablated:=0
+remove_bulkhead:={
+  foreach facet ff do {
+    if ff.original==ablation_oid then {
+      ff.color:=blue;
+      ff.youngs:=.001;
+      ablated:=1;
+    };
+  };
+}
+
+return_bulkhead:={
+  foreach facet ff do {
+    if ff.original==ablation_oid then {
+      ff.color:=green;
+      ff.youngs:=bulkheadyoungs;
+      unset ff nodisplay;
+      ablated:=0;
+    };
+  };
+}
+
+expand_header_printed:=0
+fname_expand:="error_expand.txt"
+find_outerb:={
+  if !expand_header_printed then {
+    printf "id,x,y,z,ablated,v,bulkheadyoungs,nickdepth,nickw,nickc,bbmin\n" >>> fname_expand;
+    expand_header_printed:=1;
+  };
+  foreach facet ff do {
+    if ff.original==ablation_oid then {
+      foreach ff.edges ee do {
+        if ee.valence==3 then {
+          foreach ee.vertex vv do {
+            printf "%d,%g,%g,%g,%d,%g,%g,%g,%g,%g,%g\n",vv.id,vv.x[1],vv.x[2],vv.x[3],ablated,bodies[1].volume,bulkheadyoungs,nickdepth,nickw,nickc,bbmin >> fname_expand;
+          };
+        };
+      };
+    };
+  };
+}
+
+
+
+make_equiv:={
+  cortex_equiv:=1.64;
+  cortexyoungs:=cortex_equiv;
+  set_cortex;
+  bulkheadyoungs:=0;
+  set_bulkhead;
+  foreach facet ff do {
+    if ff.color==green then {
+      set ff nodisplay;
+    };
+    if ff.color==white then {
+      ff.color:=yellow;
+    };
+  };
+  gotop;
+}
+
+
+
+//bottom .65, top 1
+nickl:=.05
+nickr:=.2
+//min: .125-.126
+
+
+bcen:=0
+bn:=0
+ibb:=1
+find_bb:={
+  bbmin:=999;
+  bbmax:=-999;
+  bcen:=0;
+  bn:=0;
+  foreach facet ff do
+  {
+    ibb:=1;
+    while ibb<4 do {
+      if ff.color==green && ff.original==ablation_oid then {
+        if ff.vertex[ibb].x>-.035 && ff.vertex[ibb].x<.28 then {
+          if ff.vertex[ibb].z>bbmax then bbmax:=ff.vertex[ibb].z;
+          if ff.vertex[ibb].z<bbmin then bbmin:=ff.vertex[ibb].z;
+        };
+        bcen+=ff.vertex[ibb].x;
+        bn+=1;
+      };
+      ibb:=ibb+1;
+    };
+  };
+  bcen:=bcen/bn;
+  nickc:=bcen;
+}
+
+//max width at rest shape: 1.18/3.6
+setnick:={
+  find_bb;
+  nickl:=nickc-nickw/2;
+  nickr:=nickc+nickw/2;
+  nickdepth:=bbmin+nickw*1.5;
+}
+
+in:=1
+nick:={
+  foreach facet ff do
+  {
+    in:=1;
+    while in<4 do {
+      if ff.vertex[in].x>nickc+(nickw/2/(nickdepth-bbmin))*(ff.vertex[in].z-nickdepth) &&
+      ff.vertex[in].x<nickc+(-nickw/2/(nickdepth-bbmin))*(ff.vertex[in].z-nickdepth) &&
+      ff.color==green && ff.original==ablation_oid && ff.vertex[in].z<nickdepth then {
+        //ff.color:=blue;
+        set ff nodisplay;
+        ff.youngs:=.001;
+      };
+      in:=in+1;
+    };
+  };
+  ablated:=1;
+}
+
+nicksq:={
+  foreach facet ff do
+  {
+    in:=1;
+    while in<4 do {
+      if ff.vertex[ii].x>nickl &&
+      ff.vertex[ii].x<nickr &&
+      ff.color==green && ff.original==ablation_oid && ff.vertex[ii].z<nickdepth then {
+        ff.color:=blue;
+        ff.youngs:=.001;
+      };
+      in:=in+1;
+    };
+  };
+  ablated:=1;
+}
+
+
+ablate_bulkhead:={
+  if nick_ablate then {
+    setnick;
+    find_outerb;
+    nick;
+  } else {
+    find_outerb;
+    remove_bulkhead;
+  };
+  g1000;
+  find_outerb;
+}
+
+v_exp:=.25
+also_ablate:=0
+ie:=1
+nexpand:=9
+expand:={
+  unset bodies[1].pressure;
+  conj_grad;
+  ie:=1;
+  while ie<=nexpand do {
+    bodies[1].target+=v_exp;
+    g500;
+    getmax;
+    get_sums;
+    print_to_file;
+    if also_ablate then {
+      ablate_bulkhead;
+      return_bulkhead;
+      g500;
+    };
+    ie:=ie+1;
+  };
+}

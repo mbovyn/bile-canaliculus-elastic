@@ -1,0 +1,9 @@
+define facet attribute youngs real
+define facet attribute poisson_ratio real
+define facet attribute form_factors real[3]
+define facet attribute rest_area real
+
+define center real[3]
+
+method_instance linlastic method linear_elastic element_modulus youngs
+quantity linlasticE energy function linlastic.value

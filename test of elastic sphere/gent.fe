@@ -1,0 +1,57 @@
+// triangle1.fe
+
+//For linear elastic
+//define facet attribute poisson_ratio real
+//define facet attribute form_factors real[3]
+//quantity elastic energy method linear_elastic global
+
+//for general elastic (non-isotropic)
+define facet attribute elastic_basis real[2][2]
+define facet attribute elastic_coeff real[6]
+quantity genlastic energy method general_linear_elastic global
+
+vertices
+1	0 0 0
+2	0 1 0
+3	0 0 1
+
+edges
+1	1 2
+2	2 3
+3	3 1
+
+faces
+//1	1 2 3 form_factors {1 1 2}
+1	1 2 3 elastic_basis {{0 1}{1 0}} elastic_coeff {1.33333, 1.33333, 0.666667, 0, 0, 1.33333}
+
+read
+
+showq
+
+set facet tension 0
+//set facet poisson_ratio 1/3
+
+
+//g200
+
+/*
+printv :=
+{
+ii:=1;
+while ii<4 do {
+printf "%f,%f,%f\n",facet[1].vertex[ii].x,facet[1].vertex[ii].y,facet[1].vertex[ii].z;
+ii:=ii+1;
+};
+printf "\n";
+}
+*/
+
+pp := {
+foreach vertex vv do {
+printf "%f,%f,%f\n",vv.x,vv.y,vv.z;
+};
+printf "\n";
+foreach edge ee do {
+printf "%f\n",ee.length;
+};
+}
